@@ -2,13 +2,11 @@ name = "ltpt-v3-worker"
 main = "worker/index.js"
 compatibility_date = "2024-09-23"
 
-# After running `wrangler d1 create ltpt-v3-db`, paste the database_id below
 [[d1_databases]]
 binding = "DB"
 database_name = "ltpt-v3-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "44141afa-f791-448b-8ab0-350b47ce2307"
 
-# After running `wrangler kv:namespace create LTPT_V3_CACHE`, paste the id below
 [[kv_namespaces]]
 binding = "LTPT_V3_CACHE"
-id = "44141afa-f791-448b-8ab0-350b47ce2307"
+id = "7f4040050bf14d51b546919198e61fa9"
