@@ -228,7 +228,26 @@ async function handleWorkout(request, env, url) {
     })
   }
 
-  const result = { session, isRestDay: false, exercises }
+  // Today's already-logged exercises — keyed by exercise_id so the UI can show logged state on load
+  const todayLogRows = await env.DB.prepare(
+    `SELECT sl.id, sl.exercise_id, sl.notes,
+            json_group_array(json_object('set_number', ss.set_number, 'weight_kg', ss.weight_kg, 'reps', ss.reps)) as sets
+     FROM session_logs sl
+     JOIN session_sets ss ON ss.session_log_id = sl.id
+     WHERE sl.athlete_id = ? AND sl.session_date = ?
+     GROUP BY sl.id`
+  ).bind(athleteId, date).all()
+
+  const todayLogs = {}
+  for (const log of todayLogRows.results) {
+    todayLogs[log.exercise_id] = {
+      logId: log.id,
+      notes: log.notes,
+      sets: JSON.parse(log.sets),
+    }
+  }
+
+  const result = { session, isRestDay: false, exercises, todayLogs }
   await env.LTPT_V3_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: 86400 })
   return json(result)
 }
