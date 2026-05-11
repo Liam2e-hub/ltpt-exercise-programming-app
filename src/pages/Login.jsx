@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const API = import.meta.env.VITE_WORKER_URL
@@ -7,7 +7,9 @@ const API = import.meta.env.VITE_WORKER_URL
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [athleteId, setAthleteId] = useState('')
+  const location = useLocation()
+  const signedUp = location.state?.signedUp
+  const [athleteId, setAthleteId] = useState(location.state?.athleteId || '')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -38,7 +40,11 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
-      <h1 className="text-2xl font-bold mb-8">LTPT</h1>
+      <h1 className="text-2xl font-bold mb-2">LTPT</h1>
+      {signedUp && (
+        <p className="text-green-400 text-sm mb-6 text-center">Account created — log in to continue</p>
+      )}
+      {!signedUp && <div className="mb-6" />}
       <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-4">
         <input
           type="text"
