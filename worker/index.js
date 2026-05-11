@@ -168,7 +168,8 @@ async function handleWorkout(request, env, url) {
 
   const cacheKey = `workout:${athleteId}:${date}`
   const cached = await env.LTPT_V3_CACHE.get(cacheKey, { type: 'json' })
-  if (cached) return json(cached)
+  // Bypass stale cache if it has no exercises for a non-rest day
+  if (cached && !(cached.isRestDay === false && cached.exercises?.length === 0)) return json(cached)
 
   const dayName = new Date(date + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'long' })
   const scheduleRow = await env.DB.prepare(
@@ -345,7 +346,8 @@ async function handleProgramAdd(request, env) {
     ).bind(athleteId, exerciseId, session, goalReps ?? null, goalWeightKg ?? null, sets ?? null, maxOrder.max + 1).run()
   }
 
-  // Invalidate today's workout cache for all dates (simple: delete by prefix isn't available, rely on natural expiry)
+  const today = new Date().toISOString().split('T')[0]
+  await env.LTPT_V3_CACHE.delete(`workout:${athleteId}:${today}`)
   return json({ success: true })
 }
 
@@ -356,6 +358,8 @@ async function handleProgramDelete(request, env, pathname) {
   if (!row) return json({ error: 'Not found' }, 404)
 
   await env.DB.prepare(`UPDATE athlete_program SET active = 0 WHERE id = ?`).bind(id).run()
+  const today = new Date().toISOString().split('T')[0]
+  await env.LTPT_V3_CACHE.delete(`workout:${row.athlete_id}:${today}`)
   return json({ success: true })
 }
 
@@ -399,6 +403,8 @@ async function handleSchedulePut(request, env) {
        ON CONFLICT(athlete_id, day) DO UPDATE SET session = excluded.session, display_order = excluded.display_order`
     ).bind(athleteId, day, session ?? null, i).run()
   }
+  const today = new Date().toISOString().split('T')[0]
+  await env.LTPT_V3_CACHE.delete(`workout:${athleteId}:${today}`)
   return json({ success: true })
 }
 
