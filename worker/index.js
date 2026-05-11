@@ -49,6 +49,7 @@ export default {
     if (pathname === '/schedule' && method === 'GET') return handleScheduleGet(request, env, url)
     if (pathname === '/schedule' && method === 'PUT') return handleSchedulePut(request, env)
     if (pathname === '/exercises' && method === 'GET') return handleExercises(request, env)
+    if (pathname === '/exercises' && method === 'POST') return handleExercisesCreate(request, env)
     if (pathname === '/progress' && method === 'GET') return handleProgress(request, env, url)
     if (pathname === '/nutrition' && method === 'GET') return handleNutritionGet(request, env, url)
     if (pathname === '/nutrition' && method === 'POST') return handleNutritionPost(request, env)
@@ -414,6 +415,37 @@ async function handleExercises(request, env) {
   const result = { exercises: rows.results }
   await env.LTPT_V3_CACHE.put('exercises:all', JSON.stringify(result), { expirationTtl: 604800 }) // 7 days
   return json(result)
+}
+
+// POST /exercises
+// Body: { exerciseName, sessionCategory, equipment, defaultReps, defaultWeightKg, defaultSets, notes }
+async function handleExercisesCreate(request, env) {
+  const body = await request.json()
+  const { exerciseName, sessionCategory, equipment, defaultReps, defaultWeightKg, defaultSets, notes } = body
+  if (!exerciseName?.trim()) return json({ error: 'Exercise name is required' }, 400)
+
+  try {
+    const result = await env.DB.prepare(
+      `INSERT INTO exercises (exercise_name, session_category, equipment, default_reps, default_weight_kg, default_sets, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      exerciseName.trim(),
+      sessionCategory || null,
+      equipment || null,
+      defaultReps || null,
+      defaultWeightKg ? parseFloat(defaultWeightKg) : null,
+      defaultSets ? parseInt(defaultSets) : null,
+      notes?.trim() || null
+    ).run()
+
+    // Invalidate exercise library cache so next GET /exercises picks up the new entry
+    await env.LTPT_V3_CACHE.delete('exercises:all')
+
+    return json({ success: true, id: result.meta.last_row_id })
+  } catch (err) {
+    if (err.message?.includes('UNIQUE')) return json({ error: 'An exercise with that name already exists' }, 409)
+    return json({ error: 'Failed to create exercise' }, 500)
+  }
 }
 
 // GET /progress?athleteId=liam&exerciseId=5

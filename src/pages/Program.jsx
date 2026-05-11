@@ -28,6 +28,18 @@ export default function Program() {
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState('')
 
+  // New exercise sheet state
+  const [newSheet, setNewSheet] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [newEquipment, setNewEquipment] = useState('')
+  const [newReps, setNewReps] = useState('')
+  const [newWeight, setNewWeight] = useState('')
+  const [newSets, setNewSets] = useState('')
+  const [newNotes, setNewNotes] = useState('')
+  const [newLoading, setNewLoading] = useState(false)
+  const [newError, setNewError] = useState('')
+
   useEffect(() => {
     Promise.all([
       fetch(`${API}/program?athleteId=${athlete.id}`).then(r => r.json()),
@@ -146,6 +158,50 @@ export default function Program() {
     }
   }
 
+  function openNewSheet() {
+    setNewName('')
+    setNewCategory('')
+    setNewEquipment('')
+    setNewReps('')
+    setNewWeight('')
+    setNewSets('')
+    setNewNotes('')
+    setNewError('')
+    setNewSheet(true)
+  }
+
+  async function handleCreateExercise() {
+    if (!newName.trim()) { setNewError('Exercise name is required'); return }
+    setNewLoading(true)
+    setNewError('')
+    try {
+      const res = await fetch(`${API}/exercises`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exerciseName: newName.trim(),
+          sessionCategory: newCategory || null,
+          equipment: newEquipment || null,
+          defaultReps: newReps || null,
+          defaultWeightKg: newWeight ? parseFloat(newWeight) : null,
+          defaultSets: newSets ? parseInt(newSets) : null,
+          notes: newNotes.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setNewError(data.error || 'Failed to create'); return }
+
+      // Refresh library so new exercise appears immediately
+      const lib = await fetch(`${API}/exercises`).then(r => r.json())
+      setLibrary(lib.exercises || [])
+      setNewSheet(false)
+    } catch {
+      setNewError('Connection error')
+    } finally {
+      setNewLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -156,9 +212,17 @@ export default function Program() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24">
-      <div className="px-4 pt-10 mb-4">
-        <h1 className="text-xl font-bold">Program</h1>
-        <p className="text-zinc-500 text-sm mt-0.5">Add exercises to each session</p>
+      <div className="px-4 pt-10 mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold">Program</h1>
+          <p className="text-zinc-500 text-sm mt-0.5">Add exercises to each session</p>
+        </div>
+        <button
+          onClick={openNewSheet}
+          className="flex-shrink-0 text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-3 py-2 rounded-xl font-medium active:bg-zinc-700"
+        >
+          + New Exercise
+        </button>
       </div>
 
       <div className="px-4 flex flex-col gap-4">
@@ -340,6 +404,134 @@ export default function Program() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* New exercise bottom sheet */}
+      {newSheet && (
+        <div className="fixed inset-0 z-50 flex flex-col">
+          <div className="flex-1 bg-black/60" onClick={() => setNewSheet(false)} />
+          <div className="bg-zinc-900 rounded-t-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-zinc-800">
+              <p className="font-semibold">New exercise</p>
+              <button onClick={() => setNewSheet(false)} className="text-zinc-500 text-2xl leading-none">×</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-4 py-4 flex flex-col gap-4">
+
+              {/* Name */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Exercise name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bulgarian Split Squat"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  autoFocus
+                  className="w-full bg-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-1.5 block">Category</label>
+                <div className="flex gap-2">
+                  {['Compound', 'Isolation', 'Accessory'].map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewCategory(newCategory === c ? '' : c)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                        newCategory === c
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Equipment */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-1.5 block">Equipment</label>
+                <div className="flex flex-wrap gap-2">
+                  {['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Kettlebell'].map(e => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setNewEquipment(newEquipment === e ? '' : e)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                        newEquipment === e
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                      }`}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Defaults */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1 block">Default sets</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="3"
+                    value={newSets}
+                    onChange={e => setNewSets(e.target.value)}
+                    className="w-full bg-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1 block">Default reps</label>
+                  <input
+                    type="text"
+                    placeholder="8-10"
+                    value={newReps}
+                    onChange={e => setNewReps(e.target.value)}
+                    className="w-full bg-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1 block">Default kg</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={newWeight}
+                    onChange={e => setNewWeight(e.target.value)}
+                    className="w-full bg-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Coaching notes */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Coaching notes</label>
+                <textarea
+                  placeholder="Cues, form tips, common mistakes..."
+                  value={newNotes}
+                  onChange={e => setNewNotes(e.target.value)}
+                  rows={3}
+                  className="w-full bg-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              {newError && <p className="text-red-400 text-xs">{newError}</p>}
+
+              <button
+                onClick={handleCreateExercise}
+                disabled={newLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl py-3 font-semibold text-sm mb-2"
+              >
+                {newLoading ? 'Creating...' : 'Create exercise'}
+              </button>
+            </div>
           </div>
         </div>
       )}
