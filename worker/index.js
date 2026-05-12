@@ -50,6 +50,7 @@ export default {
     if (pathname === '/schedule' && method === 'PUT') return handleSchedulePut(request, env)
     if (pathname === '/exercises' && method === 'GET') return handleExercises(request, env)
     if (pathname === '/exercises' && method === 'POST') return handleExercisesCreate(request, env)
+    if (pathname === '/progress/exercises' && method === 'GET') return handleProgressExercises(request, env, url)
     if (pathname === '/progress' && method === 'GET') return handleProgress(request, env, url)
     if (pathname === '/nutrition' && method === 'GET') return handleNutritionGet(request, env, url)
     if (pathname === '/nutrition' && method === 'POST') return handleNutritionPost(request, env)
@@ -452,6 +453,21 @@ async function handleExercisesCreate(request, env) {
     if (err.message?.includes('UNIQUE')) return json({ error: 'An exercise with that name already exists' }, 409)
     return json({ error: 'Failed to create exercise' }, 500)
   }
+}
+
+// GET /progress/exercises?athleteId=liam
+async function handleProgressExercises(request, env, url) {
+  const athleteId = url.searchParams.get('athleteId')
+  if (!athleteId) return json({ error: 'Missing athleteId' }, 400)
+
+  const rows = await env.DB.prepare(
+    `SELECT DISTINCT exercise_id, exercise_name
+     FROM session_logs
+     WHERE athlete_id = ? AND exercise_id IS NOT NULL
+     ORDER BY exercise_name ASC`
+  ).bind(athleteId).all()
+
+  return json({ exercises: rows.results })
 }
 
 // GET /progress?athleteId=liam&exerciseId=5
