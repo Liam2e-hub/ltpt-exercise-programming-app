@@ -26,4 +26,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.90.0"
-          command: d1 execute ltpt-v3-db --file=./migrations/003_import_v1_session_history.sql --remote --verbose
+          command: d1 execute ltpt-v3-db --file=./migrations/003_import_v1_session_history.sql --remote
