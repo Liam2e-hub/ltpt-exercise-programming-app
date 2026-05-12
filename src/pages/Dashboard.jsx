@@ -32,6 +32,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [colWidth, setColWidth] = useState(72)
   const today = new Date().toISOString().split('T')[0]
   const historyScrollRef = useRef(null)
 
@@ -40,9 +41,11 @@ export default function Dashboard() {
       .then(r => r.json())
       .then(d => {
         setData(d)
-        // Auto-scroll training history to the most recent (rightmost) week
+        // Size columns to show exactly 3, then scroll to most recent week
         setTimeout(() => {
           if (historyScrollRef.current) {
+            const w = Math.floor((historyScrollRef.current.clientWidth - 120) / 3)
+            setColWidth(w > 40 ? w : 72)
             historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth
           }
         }, 50)
@@ -221,17 +224,22 @@ export default function Dashboard() {
           <p className="text-xs text-zinc-600 text-center py-4">No program data yet</p>
         ) : (
           <div ref={historyScrollRef} className="overflow-x-auto -mx-1 px-1">
-            <table className="border-separate border-spacing-0" style={{ minWidth: `${120 + weekStarts.length * 72}px` }}>
+            <table className="border-separate border-spacing-0" style={{ minWidth: `${120 + weekStarts.length * colWidth}px` }}>
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 bg-zinc-900 text-left text-[10px] text-zinc-600 font-normal pb-2 pr-2" style={{ minWidth: 120, maxWidth: 120 }} />
-                  {weekStarts.map(w => {
+                  <th className="sticky left-0 z-10 bg-zinc-900 pb-2 pr-2 border-b border-zinc-700" style={{ minWidth: 120, maxWidth: 120 }} />
+                  {weekStarts.map((w, wi) => {
                     const [, m, dd] = w.split('-')
                     const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]
+                    const isCurrent = wi === weekStarts.length - 1
                     return (
-                      <th key={w} className="text-center pb-2 px-1" style={{ width: 72, minWidth: 72 }}>
-                        <div className="text-[10px] text-zinc-500 leading-tight font-normal">{parseInt(dd)}</div>
-                        <div className="text-[10px] text-zinc-600 leading-tight font-normal">{mon}</div>
+                      <th
+                        key={w}
+                        className={`text-center pb-2 border-b border-zinc-700 ${wi < weekStarts.length - 1 ? 'border-r border-r-zinc-700' : ''}`}
+                        style={{ width: colWidth, minWidth: colWidth }}
+                      >
+                        <div className={`text-[10px] leading-tight font-semibold ${isCurrent ? 'text-blue-400' : 'text-zinc-500'}`}>{parseInt(dd)}</div>
+                        <div className={`text-[10px] leading-tight font-normal ${isCurrent ? 'text-blue-500' : 'text-zinc-600'}`}>{mon}</div>
                       </th>
                     )
                   })}
@@ -240,51 +248,66 @@ export default function Dashboard() {
               <tbody>
                 {historySessions.map(({ session, exercises }) => (
                   <>
+                    {/* Session header row — tinted background */}
                     <tr key={`hdr-${session}`}>
                       <td
-                        className="sticky left-0 z-10 bg-zinc-900 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider pt-3 pb-1 pr-2 whitespace-nowrap overflow-hidden"
+                        className="sticky left-0 z-10 bg-zinc-800 text-[10px] font-semibold text-zinc-300 uppercase tracking-wider pt-3 pb-1 pr-2 whitespace-nowrap overflow-hidden border-b border-zinc-700"
                         style={{ minWidth: 120, maxWidth: 120 }}
                       >
                         {session}
                       </td>
-                      {weekStarts.map(w => <td key={w} />)}
+                      {weekStarts.map((w, wi) => (
+                        <td
+                          key={w}
+                          className={`bg-zinc-800 border-b border-zinc-700 ${wi < weekStarts.length - 1 ? 'border-r border-r-zinc-700' : ''}`}
+                        />
+                      ))}
                     </tr>
-                    {exercises.map(ex => {
+                    {/* Exercise rows */}
+                    {exercises.map((ex, ei) => {
+                      const isLastEx = ei === exercises.length - 1
                       return (
                         <tr key={ex.exercise_id}>
                           <td
-                            className="sticky left-0 z-10 bg-zinc-900 text-[11px] text-zinc-300 py-1 pr-2 whitespace-nowrap overflow-hidden"
+                            className={`sticky left-0 z-10 bg-zinc-900 text-[11px] text-zinc-300 py-1.5 pr-2 whitespace-nowrap overflow-hidden ${!isLastEx ? 'border-b border-zinc-700' : ''}`}
                             style={{ minWidth: 120, maxWidth: 120, textOverflow: 'ellipsis' }}
                             title={ex.exercise_name}
                           >
                             {ex.exercise_name}
                           </td>
-                          {weekStarts.map(w => {
+                          {weekStarts.map((w, wi) => {
                             const sets = logsMap[ex.exercise_id]?.[w]
+                            const isCurrent = wi === weekStarts.length - 1
+                            const borderR = wi < weekStarts.length - 1 ? 'border-r border-r-zinc-700' : ''
+                            const borderB = !isLastEx ? 'border-b border-zinc-700' : ''
+                            const colBg = isCurrent ? 'bg-blue-950/20' : ''
+
                             if (sets && sets.length > 0) {
                               const cols = Math.min(sets.length, 3)
                               return (
-                                <td key={w} className="py-1 px-1 align-middle" style={{ width: 72 }}>
-                                  <div
-                                    className="grid gap-x-0.5"
-                                    style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
-                                  >
-                                    {sets.map((s, i) => (
-                                      <div key={`r${i}`} className="text-center text-[9px] text-zinc-400 leading-tight tabular-nums">
-                                        {s.r ?? '—'}
-                                      </div>
-                                    ))}
-                                    {sets.map((s, i) => (
-                                      <div key={`w${i}`} className="text-center text-[9px] font-semibold text-blue-400 leading-tight tabular-nums">
-                                        {s.w != null ? s.w : 'BW'}
-                                      </div>
-                                    ))}
+                                <td key={w} className={`py-1.5 px-1 align-middle ${borderR} ${borderB} ${colBg}`} style={{ width: colWidth }}>
+                                  <div className="bg-zinc-800 rounded p-0.5">
+                                    <div
+                                      className="grid gap-x-px"
+                                      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+                                    >
+                                      {sets.map((s, i) => (
+                                        <div key={`r${i}`} className="text-center text-[9px] text-zinc-400 leading-tight tabular-nums">
+                                          {s.r ?? '—'}
+                                        </div>
+                                      ))}
+                                      {sets.map((s, i) => (
+                                        <div key={`w${i}`} className="text-center text-[9px] font-semibold text-blue-400 leading-tight tabular-nums">
+                                          {s.w != null ? s.w : 'BW'}
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
                                 </td>
                               )
                             }
                             return (
-                              <td key={w} className="text-center py-1" style={{ width: 72 }}>
+                              <td key={w} className={`text-center py-1.5 ${borderR} ${borderB} ${colBg}`} style={{ width: colWidth }}>
                                 <span className="text-[11px] text-zinc-700">·</span>
                               </td>
                             )
