@@ -9,6 +9,7 @@ import Program from './pages/Program'
 import Schedule from './pages/Schedule'
 import Progress from './pages/Progress'
 import Nutrition from './pages/Nutrition'
+import Profile from './pages/Profile'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/schedule" element={<ProtectedRoute><Schedule /></ProtectedRoute>} />
           <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
           <Route path="/nutrition" element={<ProtectedRoute><Nutrition /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

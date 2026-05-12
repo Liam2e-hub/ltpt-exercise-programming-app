@@ -57,6 +57,7 @@ export default {
     if (pathname === '/meals' && method === 'GET') return handleMealsGet(request, env, url)
     if (pathname === '/meals' && method === 'POST') return handleMealsPost(request, env)
     if (pathname.match(/^\/meals\/\d+$/) && method === 'DELETE') return handleMealsDelete(request, env, pathname)
+    if (pathname === '/athlete' && method === 'PATCH') return handleAthleteUpdate(request, env)
 
     return notFound()
   },
@@ -134,7 +135,7 @@ async function handleDashboard(request, env, url) {
   if (!athleteId) return json({ error: 'Missing athleteId' }, 400)
 
   const athlete = await env.DB.prepare(
-    `SELECT id, first_name, age, height_cm, weight_kg, main_goal FROM athletes WHERE id = ? AND active = 1`
+    `SELECT id, first_name, age, height_cm, weight_kg, email, main_goal FROM athletes WHERE id = ? AND active = 1`
   ).bind(athleteId).first()
   if (!athlete) return json({ error: 'Athlete not found' }, 404)
 
@@ -143,21 +144,55 @@ async function handleDashboard(request, env, url) {
     `SELECT session FROM schedules WHERE athlete_id = ? AND day = ?`
   ).bind(athleteId, dayName).first()
 
+  const session = scheduleRow?.session ?? null
+
   const nutrition = await env.DB.prepare(
     `SELECT COALESCE(SUM(calories),0) as calories, COALESCE(SUM(protein_g),0) as protein_g,
             COALESCE(SUM(carbs_g),0) as carbs_g, COALESCE(SUM(fat_g),0) as fat_g
      FROM nutrition_logs WHERE athlete_id = ? AND log_date = ?`
   ).bind(athleteId, date).first()
 
+  // Workout completion counts for today
+  let totalExercises = 0
+  let loggedExercises = 0
+  if (session) {
+    const total = await env.DB.prepare(
+      `SELECT COUNT(*) as count FROM athlete_program WHERE athlete_id = ? AND session = ? AND active = 1`
+    ).bind(athleteId, session).first()
+    totalExercises = total?.count ?? 0
+
+    const logged = await env.DB.prepare(
+      `SELECT COUNT(*) as count FROM session_logs WHERE athlete_id = ? AND session_date = ?`
+    ).bind(athleteId, date).first()
+    loggedExercises = logged?.count ?? 0
+  }
+
+  // Recent training sessions (last 10 weeks, active schedule sessions only)
+  const recentRows = await env.DB.prepare(
+    `SELECT sl.session_date, sl.session, COUNT(DISTINCT sl.id) as exercises_logged
+     FROM session_logs sl
+     WHERE sl.athlete_id = ?
+       AND sl.session_date >= date('now', '-70 days')
+       AND sl.session IN (
+         SELECT DISTINCT session FROM schedules WHERE athlete_id = ? AND session IS NOT NULL
+       )
+     GROUP BY sl.session_date, sl.session
+     ORDER BY sl.session_date DESC
+     LIMIT 60`
+  ).bind(athleteId, athleteId).all()
+
   return json({
     athlete,
     today: {
       date,
       day: dayName,
-      session: scheduleRow?.session ?? null,
-      isRestDay: !scheduleRow?.session,
+      session,
+      isRestDay: !session,
+      totalExercises,
+      loggedExercises,
     },
     nutrition,
+    recentSessions: recentRows.results,
   })
 }
 
@@ -561,4 +596,24 @@ async function handleMealsDelete(request, env, pathname) {
   const id = parseInt(pathname.split('/')[2])
   await env.DB.prepare(`DELETE FROM regular_meals WHERE id = ?`).bind(id).run()
   return json({ success: true })
+}
+
+// PATCH /athlete
+// Body: { athleteId, firstName, age, heightCm, weightKg, email, mainGoal }
+async function handleAthleteUpdate(request, env) {
+  const body = await request.json()
+  const { athleteId, firstName, age, heightCm, weightKg, email, mainGoal } = body
+  if (!athleteId || !firstName?.trim()) return json({ error: 'Missing required fields' }, 400)
+
+  await env.DB.prepare(
+    `UPDATE athletes SET first_name = ?, age = ?, height_cm = ?, weight_kg = ?, email = ?, main_goal = ? WHERE id = ?`
+  ).bind(firstName.trim(), age ?? null, heightCm ?? null, weightKg ?? null, email?.trim() || null, mainGoal?.trim() || null, athleteId).run()
+
+  const updated = await env.DB.prepare(
+    `SELECT id, first_name, age, height_cm, weight_kg, email, main_goal, date_started FROM athletes WHERE id = ?`
+  ).bind(athleteId).first()
+
+  await env.LTPT_V3_CACHE.put(`athlete:${athleteId}`, JSON.stringify(updated), { expirationTtl: 86400 })
+
+  return json({ athlete: updated })
 }

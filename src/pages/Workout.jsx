@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import Nav from '../components/Nav'
+import Layout from '../components/Layout'
 import ExerciseCard from '../components/ExerciseCard'
 
 const API = import.meta.env.VITE_WORKER_URL
@@ -22,30 +22,29 @@ export default function Workout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-zinc-500">Loading...</p>
-      </div>
+      <Layout>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-zinc-500">Loading...</p>
+        </div>
+      </Layout>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-3">
-        <p className="text-red-400 text-sm text-center">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="text-sm text-blue-400"
-        >
-          Retry
-        </button>
-      </div>
+      <Layout>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 gap-3">
+          <p className="text-red-400 text-sm text-center">{error}</p>
+          <button onClick={() => window.location.reload()} className="text-sm text-blue-400">Retry</button>
+        </div>
+      </Layout>
     )
   }
 
   if (data?.isRestDay) {
     return (
-      <div className="min-h-screen flex flex-col pb-24">
-        <div className="px-4 pt-10 mb-2">
+      <Layout>
+        <div className="px-4 pt-4 mb-2">
           <h1 className="text-xl font-bold">Workout</h1>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
@@ -53,24 +52,29 @@ export default function Workout() {
           <p className="text-lg font-semibold">Rest Day</p>
           <p className="text-zinc-500 text-sm mt-1">Recovery is part of the program.</p>
         </div>
-        <Nav />
-      </div>
+      </Layout>
     )
   }
 
   const loggedCount = data?.exercises.filter(e => data.todayLogs?.[e.exerciseId]).length ?? 0
   const totalCount = data?.exercises.length ?? 0
+  const allLogged = totalCount > 0 && loggedCount >= totalCount
 
   return (
-    <div className="min-h-screen flex flex-col pb-24">
-      <div className="px-4 pt-10 mb-1">
-        <h1 className="text-xl font-bold">Workout</h1>
-        <div className="flex items-baseline gap-2 mt-0.5">
-          <p className="text-zinc-400 text-sm">{data?.session}</p>
+    <Layout>
+      <div className="px-4 pt-4 mb-1">
+        <div className="flex items-baseline justify-between">
+          <h1 className="text-xl font-bold">Workout</h1>
           {totalCount > 0 && (
-            <p className="text-xs text-zinc-600">{loggedCount}/{totalCount} logged</p>
+            <p className={`text-xs font-medium ${allLogged ? 'text-green-400' : 'text-zinc-600'}`}>
+              {loggedCount}/{totalCount} logged
+            </p>
           )}
         </div>
+        <p className="text-zinc-400 text-sm mt-0.5">{data?.session}</p>
+        {allLogged && (
+          <p className="text-green-400 text-xs mt-1 font-medium">🔥 You smashed it today!</p>
+        )}
       </div>
 
       <div className="px-4 pt-3 flex flex-col gap-3">
@@ -88,12 +92,10 @@ export default function Workout() {
         {totalCount === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-zinc-500 text-sm">No exercises in this session.</p>
-            <p className="text-zinc-600 text-xs mt-1">Add some in the Program manager.</p>
+            <p className="text-zinc-600 text-xs mt-1">Add some via Profile → Exercise Program.</p>
           </div>
         )}
       </div>
-
-      <Nav />
-    </div>
+    </Layout>
   )
 }

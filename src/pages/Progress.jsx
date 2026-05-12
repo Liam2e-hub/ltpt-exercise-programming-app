@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import Nav from '../components/Nav'
+import Layout from '../components/Layout'
 import {
   ResponsiveContainer,
   LineChart, Line,
@@ -55,8 +55,9 @@ export default function Progress() {
   const history = [...chartData].reverse()
 
   return (
-    <div className="min-h-screen flex flex-col pb-24 px-4 pt-10">
-      <h1 className="text-2xl font-bold mb-4">Progress</h1>
+    <Layout>
+    <div className="px-4 pt-4 pb-4">
+      <h1 className="text-xl font-bold mb-4">Progress</h1>
 
       {/* Exercise selector */}
       {loadingEx ? (
@@ -161,7 +162,7 @@ export default function Progress() {
         </>
       )}
 
-      <Nav />
     </div>
+    </Layout>
   )
 }

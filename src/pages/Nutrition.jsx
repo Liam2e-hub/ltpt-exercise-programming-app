@@ -1,14 +1,12 @@
-// Phase 6 — meal log, macro totals, regular meals
-import Nav from '../components/Nav'
+import Layout from '../components/Layout'
 
 export default function Nutrition() {
   return (
-    <div className="min-h-screen flex flex-col pb-20">
-      <div className="px-4 pt-8">
+    <Layout>
+      <div className="px-4 pt-4">
         <h1 className="text-xl font-bold">Nutrition</h1>
-        <p className="text-zinc-400 text-sm mt-1">Phase 6</p>
+        <p className="text-zinc-400 text-sm mt-1">Phase 6 — coming soon</p>
       </div>
-      <Nav />
-    </div>
+    </Layout>
   )
 }
