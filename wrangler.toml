@@ -1,6 +1,6 @@
 name = "ltpt-exercise-programming-app"
 main = "worker/index.js"
-compatibility_date = "2025-09-23"
+compatibility_date = "2025-11-10"
 
 [[d1_databases]]
 binding = "DB"
