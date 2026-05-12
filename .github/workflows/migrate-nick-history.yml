@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Strip unsupported SQL statements
         run: |
           sed -i '/^PRAGMA foreign_keys/d' migrations/004_import_nick_somma_session_history.sql
