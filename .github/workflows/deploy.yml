@@ -2,7 +2,7 @@ name: Deploy Worker
 
 on:
   push:
-    branches: [claude/resume-ltpt-v3-elWkG]
+    branches: [claude/resume-ltpt-v3-ZT3Mc]
 
 jobs:
   deploy:
