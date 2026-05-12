@@ -10,3 +10,28 @@ body {
   @apply bg-zinc-950 text-white;
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+/* Light mode — toggled via html.light class */
+html.light body {
+  background-color: #fafafa;
+  color: #18181b;
+}
+
+html.light .bg-zinc-950 { background-color: #fafafa !important; }
+html.light .bg-zinc-900 { background-color: #f0f0f1 !important; }
+html.light .bg-zinc-800 { background-color: #e2e2e5 !important; }
+html.light .bg-zinc-700 { background-color: #d0d0d4 !important; }
+
+html.light .text-white { color: #18181b !important; }
+html.light .text-zinc-300 { color: #3f3f46 !important; }
+html.light .text-zinc-400 { color: #52525b !important; }
+html.light .text-zinc-500 { color: #71717a !important; }
+html.light .text-zinc-600 { color: #52525b !important; }
+
+html.light .border-zinc-800 { border-color: #d4d4d8 !important; }
+html.light .border-zinc-700 { border-color: #a1a1aa !important; }
+
+html.light .placeholder-zinc-500::placeholder { color: #a1a1aa !important; }
+html.light .placeholder-zinc-600::placeholder { color: #a1a1aa !important; }
+
+html.light nav.fixed { background-color: #f0f0f1 !important; border-top-color: #d4d4d8 !important; }

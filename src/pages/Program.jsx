@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
-import Nav from '../components/Nav'
+import Layout from '../components/Layout'
 
 const API = import.meta.env.VITE_WORKER_URL
 
@@ -204,15 +204,17 @@ export default function Program() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-zinc-500">Loading...</p>
-      </div>
+      <Layout>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-zinc-500">Loading...</p>
+        </div>
+      </Layout>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-24">
-      <div className="px-4 pt-10 mb-4 flex items-start justify-between gap-3">
+    <Layout>
+      <div className="px-4 pt-4 mb-4 flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">Program</h1>
           <p className="text-zinc-500 text-sm mt-0.5">Add exercises to each session</p>
@@ -292,8 +294,6 @@ export default function Program() {
           )
         })}
       </div>
-
-      <Nav />
 
       {/* Add exercise bottom sheet */}
       {addSheet && (
@@ -535,6 +535,6 @@ export default function Program() {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   )
 }

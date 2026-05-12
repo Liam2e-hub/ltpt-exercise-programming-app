@@ -3,10 +3,9 @@ import { NavLink } from 'react-router-dom'
 const links = [
   { to: '/dashboard', label: 'Home' },
   { to: '/workout', label: 'Workout' },
-  { to: '/program', label: 'Program' },
-  { to: '/schedule', label: 'Schedule' },
   { to: '/progress', label: 'Progress' },
   { to: '/nutrition', label: 'Nutrition' },
+  { to: '/profile', label: 'Profile' },
 ]
 
 export default function Nav() {

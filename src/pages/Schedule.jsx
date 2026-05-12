@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import Nav from '../components/Nav'
+import Layout from '../components/Layout'
 
 const API = import.meta.env.VITE_WORKER_URL
 
@@ -80,15 +80,17 @@ export default function Schedule() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-zinc-500">Loading...</p>
-      </div>
+      <Layout>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-zinc-500">Loading...</p>
+        </div>
+      </Layout>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-24">
-      <div className="px-4 pt-10 mb-4 flex items-center justify-between">
+    <Layout>
+      <div className="px-4 pt-4 mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Schedule</h1>
           <p className="text-zinc-500 text-sm mt-0.5">Tap a day to change its session</p>
@@ -121,8 +123,6 @@ export default function Schedule() {
         })}
       </div>
 
-      <Nav />
-
       {/* Session picker bottom sheet */}
       {picker !== null && (
         <div className="fixed inset-0 z-50 flex flex-col">
@@ -153,6 +153,6 @@ export default function Schedule() {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   )
 }

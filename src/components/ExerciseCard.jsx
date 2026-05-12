@@ -211,7 +211,7 @@ export default function ExerciseCard({ exercise, athleteId, sessionDate, session
             {sets.length > 1 && (
               <button
                 onClick={removeSet}
-                className="text-xs text-zinc-500 bg-zinc-800 px-3 py-1.5 rounded-lg active:opacity-70"
+                className="text-xs text-rose-400 bg-zinc-800 px-3 py-1.5 rounded-lg active:opacity-70"
               >
                 − Set
               </button>
