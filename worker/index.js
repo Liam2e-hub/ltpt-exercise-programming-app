@@ -616,36 +616,36 @@ async function handleNutritionLogDelete(request, env, pathname) {
 // POST /nutrition/estimate
 // Body: { description } — calls Claude API, returns { calories, protein_g, carbs_g, fat_g }
 async function handleNutritionEstimate(request, env) {
-  const body = await request.json()
-  const { description } = body
-  if (!description?.trim()) return json({ error: 'Missing description' }, 400)
-  if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500)
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 150,
-      messages: [{
-        role: 'user',
-        content: `Estimate the macros for this meal: "${description.trim()}". Reply ONLY with a JSON object, no other text: {"calories": 450, "protein_g": 35, "carbs_g": 45, "fat_g": 12}`,
-      }],
-    }),
-  })
-
-  if (!response.ok) {
-    const errText = await response.text()
-    return json({ error: 'AI estimate failed', details: errText }, 500)
-  }
-
-  const data = await response.json()
-  const text = data.content?.[0]?.text?.trim()
   try {
+    const body = await request.json()
+    const { description } = body
+    if (!description?.trim()) return json({ error: 'Missing description' }, 400)
+    if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500)
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 150,
+        messages: [{
+          role: 'user',
+          content: `Estimate the macros for this meal: "${description.trim()}". Reply ONLY with a JSON object, no other text: {"calories": 450, "protein_g": 35, "carbs_g": 45, "fat_g": 12}`,
+        }],
+      }),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      return json({ error: 'AI estimate failed', details: errText }, 500)
+    }
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text?.trim()
     const macros = JSON.parse(text)
     return json({
       calories: Math.round(macros.calories ?? 0),
@@ -653,8 +653,8 @@ async function handleNutritionEstimate(request, env) {
       carbs_g: Math.round((macros.carbs_g ?? 0) * 10) / 10,
       fat_g: Math.round((macros.fat_g ?? 0) * 10) / 10,
     })
-  } catch {
-    return json({ error: 'Failed to parse AI response' }, 500)
+  } catch (err) {
+    return json({ error: 'Estimate exception', details: err.message }, 500)
   }
 }
 
