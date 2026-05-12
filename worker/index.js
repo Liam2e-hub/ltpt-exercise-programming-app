@@ -178,18 +178,27 @@ async function handleDashboard(request, env, url) {
      ORDER BY ap.session, ap.display_order ASC`
   ).bind(athleteId).all()
 
-  // Weekly max weight per exercise — past 70 days, grouped by Monday of that week
+  // Most recent session's sets per exercise per week — past 70 days
   const weeklyLogRows = await env.DB.prepare(
-    `SELECT
-       sl.exercise_id,
-       date(sl.session_date, '-' || ((cast(strftime('%w', sl.session_date) as integer) + 6) % 7) || ' days') as week_start,
-       MAX(ss.weight_kg) as max_weight
-     FROM session_logs sl
-     JOIN session_sets ss ON ss.session_log_id = sl.id
-     WHERE sl.athlete_id = ?
-       AND sl.session_date >= date('now', '-70 days')
-       AND sl.exercise_id IS NOT NULL
-     GROUP BY sl.exercise_id, week_start`
+    `WITH latest AS (
+       SELECT id, exercise_id,
+         date(session_date, '-' || ((cast(strftime('%w', session_date) as integer) + 6) % 7) || ' days') as week_start,
+         ROW_NUMBER() OVER (
+           PARTITION BY exercise_id,
+             date(session_date, '-' || ((cast(strftime('%w', session_date) as integer) + 6) % 7) || ' days')
+           ORDER BY session_date DESC, id DESC
+         ) as rn
+       FROM session_logs
+       WHERE athlete_id = ?
+         AND session_date >= date('now', '-70 days')
+         AND exercise_id IS NOT NULL
+     )
+     SELECT l.exercise_id, l.week_start,
+       json_group_array(json_object('n', ss.set_number, 'w', ss.weight_kg, 'r', ss.reps)) as sets
+     FROM latest l
+     JOIN session_sets ss ON ss.session_log_id = l.id
+     WHERE l.rn = 1
+     GROUP BY l.exercise_id, l.week_start`
   ).bind(athleteId).all()
 
   return json({
