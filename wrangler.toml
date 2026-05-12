@@ -1,4 +1,4 @@
-name = "ltpt-exercise-programming-app"
+name = "ltpt-v3-worker"
 main = "worker/index.js"
 compatibility_date = "2025-11-10"
 

@@ -167,19 +167,16 @@ async function handleDashboard(request, env, url) {
     loggedExercises = logged?.count ?? 0
   }
 
-  // Recent training sessions (last 10 weeks, active schedule sessions only)
+  // Recent training sessions — last 70 days (all sessions, no schedule filter)
   const recentRows = await env.DB.prepare(
     `SELECT sl.session_date, sl.session, COUNT(DISTINCT sl.id) as exercises_logged
      FROM session_logs sl
      WHERE sl.athlete_id = ?
        AND sl.session_date >= date('now', '-70 days')
-       AND sl.session IN (
-         SELECT DISTINCT session FROM schedules WHERE athlete_id = ? AND session IS NOT NULL
-       )
      GROUP BY sl.session_date, sl.session
      ORDER BY sl.session_date DESC
-     LIMIT 60`
-  ).bind(athleteId, athleteId).all()
+     LIMIT 70`
+  ).bind(athleteId).all()
 
   return json({
     athlete,
