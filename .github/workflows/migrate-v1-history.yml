@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Disable FK enforcement for import
+        run: sed -i 's/PRAGMA foreign_keys = ON/PRAGMA foreign_keys = OFF/g' migrations/003_import_v1_session_history.sql
+
       - name: Execute V1 history migration
         uses: cloudflare/wrangler-action@v3
         with:
