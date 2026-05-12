@@ -52,9 +52,11 @@ export default {
     if (pathname === '/exercises' && method === 'POST') return handleExercisesCreate(request, env)
     if (pathname === '/progress/exercises' && method === 'GET') return handleProgressExercises(request, env, url)
     if (pathname === '/progress' && method === 'GET') return handleProgress(request, env, url)
+    if (pathname === '/nutrition/estimate' && method === 'POST') return handleNutritionEstimate(request, env)
     if (pathname === '/nutrition' && method === 'GET') return handleNutritionGet(request, env, url)
     if (pathname === '/nutrition' && method === 'POST') return handleNutritionPost(request, env)
-    if (pathname === '/meals' && method === 'GET') return handleMealsGet(request, env, url)
+    if (pathname.match(/^\/nutrition\/\d+$/) && method === 'DELETE') return handleNutritionLogDelete(request, env, pathname)
+    if (pathname === '/meals' && method === 'GET') return handleMealsGet(request, env)
     if (pathname === '/meals' && method === 'POST') return handleMealsPost(request, env)
     if (pathname.match(/^\/meals\/\d+$/) && method === 'DELETE') return handleMealsDelete(request, env, pathname)
     if (pathname === '/athlete' && method === 'PATCH') return handleAthleteUpdate(request, env)
@@ -573,30 +575,26 @@ async function handleNutritionPost(request, env) {
   return json({ success: true, id: result.meta.last_row_id })
 }
 
-// GET /meals?athleteId=liam
-async function handleMealsGet(request, env, url) {
-  const athleteId = url.searchParams.get('athleteId')
-  if (!athleteId) return json({ error: 'Missing athleteId' }, 400)
-
+// GET /meals — returns all shared meals (no athlete filter)
+async function handleMealsGet(request, env) {
   const rows = await env.DB.prepare(
     `SELECT id, meal_name, meal_type, calories, protein_g, carbs_g, fat_g, notes
-     FROM regular_meals WHERE athlete_id = ? ORDER BY meal_name ASC`
-  ).bind(athleteId).all()
-
+     FROM regular_meals ORDER BY meal_type ASC, meal_name ASC`
+  ).all()
   return json({ meals: rows.results })
 }
 
-// POST /meals
-// Body: { athleteId, mealName, mealType, calories, proteinG, carbsG, fatG, notes }
+// POST /meals — creates a shared meal (no athleteId required)
+// Body: { mealName, mealType, calories, proteinG, carbsG, fatG, notes }
 async function handleMealsPost(request, env) {
   const body = await request.json()
-  const { athleteId, mealName, mealType, calories, proteinG, carbsG, fatG, notes } = body
-  if (!athleteId || !mealName) return json({ error: 'Missing required fields' }, 400)
+  const { mealName, mealType, calories, proteinG, carbsG, fatG, notes } = body
+  if (!mealName) return json({ error: 'Missing meal name' }, 400)
 
   const result = await env.DB.prepare(
-    `INSERT INTO regular_meals (athlete_id, meal_name, meal_type, calories, protein_g, carbs_g, fat_g, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(athleteId, mealName, mealType ?? null, calories ?? null, proteinG ?? null, carbsG ?? null, fatG ?? null, notes ?? null).run()
+    `INSERT INTO regular_meals (meal_name, meal_type, calories, protein_g, carbs_g, fat_g, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(mealName, mealType ?? null, calories ?? null, proteinG ?? null, carbsG ?? null, fatG ?? null, notes ?? null).run()
 
   return json({ success: true, id: result.meta.last_row_id })
 }
@@ -606,6 +604,55 @@ async function handleMealsDelete(request, env, pathname) {
   const id = parseInt(pathname.split('/')[2])
   await env.DB.prepare(`DELETE FROM regular_meals WHERE id = ?`).bind(id).run()
   return json({ success: true })
+}
+
+// DELETE /nutrition/:id
+async function handleNutritionLogDelete(request, env, pathname) {
+  const id = parseInt(pathname.split('/')[2])
+  await env.DB.prepare(`DELETE FROM nutrition_logs WHERE id = ?`).bind(id).run()
+  return json({ success: true })
+}
+
+// POST /nutrition/estimate
+// Body: { description } — calls Claude API, returns { calories, protein_g, carbs_g, fat_g }
+async function handleNutritionEstimate(request, env) {
+  const body = await request.json()
+  const { description } = body
+  if (!description?.trim()) return json({ error: 'Missing description' }, 400)
+  if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 500)
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      messages: [{
+        role: 'user',
+        content: `Estimate the macros for this meal: "${description.trim()}". Reply ONLY with a JSON object, no other text: {"calories": 450, "protein_g": 35, "carbs_g": 45, "fat_g": 12}`,
+      }],
+    }),
+  })
+
+  if (!response.ok) return json({ error: 'AI estimate failed' }, 500)
+
+  const data = await response.json()
+  const text = data.content?.[0]?.text?.trim()
+  try {
+    const macros = JSON.parse(text)
+    return json({
+      calories: Math.round(macros.calories ?? 0),
+      protein_g: Math.round((macros.protein_g ?? 0) * 10) / 10,
+      carbs_g: Math.round((macros.carbs_g ?? 0) * 10) / 10,
+      fat_g: Math.round((macros.fat_g ?? 0) * 10) / 10,
+    })
+  } catch {
+    return json({ error: 'Failed to parse AI response' }, 500)
+  }
 }
 
 // PATCH /athlete
