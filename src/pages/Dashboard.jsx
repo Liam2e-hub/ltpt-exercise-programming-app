@@ -82,7 +82,6 @@ export default function Dashboard() {
   const nutrition = data?.nutrition
   const recentSessions = data?.recentSessions || []
   const weeks = buildWeeks(recentSessions)
-  const allEmpty = weeks.every(w => w.sessions.length === 0)
 
   const workoutComplete =
     !todayData?.isRestDay &&
@@ -215,9 +214,11 @@ export default function Dashboard() {
       </button>
 
       {/* Training history — last 10 weeks */}
-      {!allEmpty && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-3">
-          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">Training History — Last 10 Weeks</p>
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-3">
+        <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">Training History — Last 10 Weeks</p>
+        {recentSessions.length === 0 ? (
+          <p className="text-xs text-zinc-600 text-center py-4">No training data yet</p>
+        ) : (
           <div className="flex flex-col gap-0.5">
             {weeks.map((week, i) => (
               <div
@@ -242,8 +243,8 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <Nav />
     </div>
