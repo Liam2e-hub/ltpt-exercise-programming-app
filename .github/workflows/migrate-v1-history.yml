@@ -17,8 +17,11 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Disable FK enforcement for import
-        run: sed -i 's/PRAGMA foreign_keys = ON/PRAGMA foreign_keys = OFF/g' migrations/003_import_v1_session_history.sql
+      - name: Prepare migration file for D1
+        run: |
+          sed -i 's/PRAGMA foreign_keys = ON/PRAGMA foreign_keys = OFF/g' migrations/003_import_v1_session_history.sql
+          sed -i '/^BEGIN TRANSACTION;/d' migrations/003_import_v1_session_history.sql
+          sed -i '/^COMMIT;/d' migrations/003_import_v1_session_history.sql
 
       - name: Execute V1 history migration
         uses: cloudflare/wrangler-action@v3
