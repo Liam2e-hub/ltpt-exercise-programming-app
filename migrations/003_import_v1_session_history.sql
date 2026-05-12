@@ -6,7 +6,7 @@
 -- IMPORTANT: Run against preview/local D1 first, then production.
 -- ============================================================
 
-PRAGMA foreign_keys = ON;
+PRAGMA foreign_keys = OFF;
 BEGIN TRANSACTION;
 
 -- 2026-05-11 | Volume Pull | Lat Pullover | liam__2026-05-11__volume-pull__lat-pullover
