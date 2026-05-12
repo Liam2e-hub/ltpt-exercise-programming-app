@@ -1,0 +1,26 @@
+name: Import Nick Somma Session History
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    name: Import Nick Somma history into D1
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Strip unsupported SQL statements
+        run: |
+          sed -i '/^PRAGMA foreign_keys/d' migrations/004_import_nick_somma_session_history.sql
+          sed -i '/^BEGIN TRANSACTION;/d' migrations/004_import_nick_somma_session_history.sql
+          sed -i '/^COMMIT;/d' migrations/004_import_nick_somma_session_history.sql
+
+      - name: Run Nick Somma history migration
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute ltpt-v3-db --file=./migrations/004_import_nick_somma_session_history.sql --remote
