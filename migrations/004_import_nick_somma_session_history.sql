@@ -1,5 +1,6 @@
 -- Migration: Import Nick Somma training history into LTPT V3 D1
 -- Generated from Notion CSV export. Do not run twice unless converted to idempotent form.
+PRAGMA foreign_keys = OFF;
 
 -- nick__2026-04-17__strength-pull__conventional-deadlift | Conventional Deadlift — Strength Pull — 17 Apr 2026
 INSERT INTO session_logs (
