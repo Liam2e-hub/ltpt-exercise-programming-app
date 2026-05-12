@@ -629,7 +629,7 @@ async function handleNutritionEstimate(request, env) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 150,
       messages: [{
         role: 'user',
@@ -638,7 +638,10 @@ async function handleNutritionEstimate(request, env) {
     }),
   })
 
-  if (!response.ok) return json({ error: 'AI estimate failed' }, 500)
+  if (!response.ok) {
+    const errText = await response.text()
+    return json({ error: 'AI estimate failed', details: errText }, 500)
+  }
 
   const data = await response.json()
   const text = data.content?.[0]?.text?.trim()
