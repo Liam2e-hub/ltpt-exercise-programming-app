@@ -66,11 +66,14 @@ export default function Dashboard() {
   // Build weeks array: oldest → newest (10 weeks)
   const weekStarts = buildWeekStarts()
 
-  // Lookup: exerciseId → weekStart → { max_weight }
+  // Lookup: exerciseId → weekStart → sets array (sorted, capped at 3)
   const logsMap = {}
   for (const log of weeklyLogs) {
     if (!logsMap[log.exercise_id]) logsMap[log.exercise_id] = {}
-    logsMap[log.exercise_id][log.week_start] = log
+    const sets = (typeof log.sets === 'string' ? JSON.parse(log.sets) : (log.sets || []))
+      .sort((a, b) => a.n - b.n)
+      .slice(0, 3)
+    logsMap[log.exercise_id][log.week_start] = sets
   }
 
   // Group program by session preserving DB order
@@ -218,7 +221,7 @@ export default function Dashboard() {
           <p className="text-xs text-zinc-600 text-center py-4">No program data yet</p>
         ) : (
           <div ref={historyScrollRef} className="overflow-x-auto -mx-1 px-1">
-            <table className="border-separate border-spacing-0" style={{ minWidth: `${120 + weekStarts.length * 48}px` }}>
+            <table className="border-separate border-spacing-0" style={{ minWidth: `${120 + weekStarts.length * 72}px` }}>
               <thead>
                 <tr>
                   <th className="sticky left-0 z-10 bg-zinc-900 text-left text-[10px] text-zinc-600 font-normal pb-2 pr-2" style={{ minWidth: 120, maxWidth: 120 }} />
@@ -226,7 +229,7 @@ export default function Dashboard() {
                     const [, m, dd] = w.split('-')
                     const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]
                     return (
-                      <th key={w} className="text-center pb-2 px-0.5" style={{ width: 48, minWidth: 48 }}>
+                      <th key={w} className="text-center pb-2 px-1" style={{ width: 72, minWidth: 72 }}>
                         <div className="text-[10px] text-zinc-500 leading-tight font-normal">{parseInt(dd)}</div>
                         <div className="text-[10px] text-zinc-600 leading-tight font-normal">{mon}</div>
                       </th>
@@ -257,16 +260,32 @@ export default function Dashboard() {
                             {ex.exercise_name}
                           </td>
                           {weekStarts.map(w => {
-                            const log = logsMap[ex.exercise_id]?.[w]
+                            const sets = logsMap[ex.exercise_id]?.[w]
+                            if (sets && sets.length > 0) {
+                              const cols = Math.min(sets.length, 3)
+                              return (
+                                <td key={w} className="py-1 px-1 align-middle" style={{ width: 72 }}>
+                                  <div
+                                    className="grid gap-x-0.5"
+                                    style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+                                  >
+                                    {sets.map((s, i) => (
+                                      <div key={`r${i}`} className="text-center text-[9px] text-zinc-400 leading-tight tabular-nums">
+                                        {s.r ?? '—'}
+                                      </div>
+                                    ))}
+                                    {sets.map((s, i) => (
+                                      <div key={`w${i}`} className="text-center text-[9px] font-semibold text-blue-400 leading-tight tabular-nums">
+                                        {s.w != null ? s.w : 'BW'}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                              )
+                            }
                             return (
-                              <td key={w} className="text-center py-1 px-0.5" style={{ width: 48 }}>
-                                {log ? (
-                                  <span className="text-[11px] font-medium text-blue-400 tabular-nums">
-                                    {log.max_weight != null ? log.max_weight : 'BW'}
-                                  </span>
-                                ) : (
-                                  <span className="text-[11px] text-zinc-700">·</span>
-                                )}
+                              <td key={w} className="text-center py-1" style={{ width: 72 }}>
+                                <span className="text-[11px] text-zinc-700">·</span>
                               </td>
                             )
                           })}
