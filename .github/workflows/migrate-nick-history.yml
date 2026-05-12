@@ -19,7 +19,7 @@ jobs:
 
       - name: Strip unsupported SQL statements
         run: |
-          sed -i '/^PRAGMA foreign_keys/d' migrations/004_import_nick_somma_session_history.sql
+          sed -i '/^PRAGMA foreign_keys = ON/d' migrations/004_import_nick_somma_session_history.sql
           sed -i '/^BEGIN TRANSACTION;/d' migrations/004_import_nick_somma_session_history.sql
           sed -i '/^COMMIT;/d' migrations/004_import_nick_somma_session_history.sql
 
