@@ -10,7 +10,7 @@ const links = [
 
 export default function Nav() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 flex">
+    <nav className="fixed bottom-0 left-0 right-0 z-20 bg-zinc-900 border-t border-zinc-800 flex">
       {links.map(({ to, label }) => (
         <NavLink
           key={to}
