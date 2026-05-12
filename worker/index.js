@@ -645,7 +645,8 @@ async function handleNutritionEstimate(request, env) {
     }
 
     const data = await response.json()
-    const text = data.content?.[0]?.text?.trim()
+    const raw = data.content?.[0]?.text?.trim() ?? ''
+    const text = raw.replace(/^```[a-z]*\n?/i, '').replace(/```$/,'').trim()
     const macros = JSON.parse(text)
     return json({
       calories: Math.round(macros.calories ?? 0),
