@@ -1,27 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Nav from '../components/Nav'
 
 const API = import.meta.env.VITE_WORKER_URL
-
-const SESSION_ABBREV = {
-  'Strength Legs': 'S.Legs',
-  'Strength Push': 'S.Push',
-  'Strength Pull': 'S.Pull',
-  'Volume Legs':   'V.Legs',
-  'Volume Push':   'V.Push',
-  'Volume Pull':   'V.Pull',
-  'Abs & Arms':    'Abs',
-}
-
-function getMondayOf(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00')
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
-  return d.toISOString().split('T')[0]
-}
 
 function fmtDate(dateStr) {
   const [, m, dd] = dateStr.split('-')
@@ -29,30 +11,19 @@ function fmtDate(dateStr) {
   return `${parseInt(dd)} ${months[parseInt(m) - 1]}`
 }
 
-function buildWeeks(recentSessions) {
+// Returns 10 week-start (Monday) dates, oldest first, newest last
+function buildWeekStarts() {
   const today = new Date()
   today.setHours(12, 0, 0, 0)
   const day = today.getDay()
   const monday = new Date(today)
   monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1))
-
   const weeks = []
-  for (let i = 0; i < 10; i++) {
+  for (let i = 9; i >= 0; i--) {
     const start = new Date(monday)
     start.setDate(monday.getDate() - i * 7)
-    const startStr = start.toISOString().split('T')[0]
-    const end = new Date(start)
-    end.setDate(start.getDate() + 6)
-    const endStr = end.toISOString().split('T')[0]
-    weeks.push({ start: startStr, end: endStr, sessions: [] })
+    weeks.push(start.toISOString().split('T')[0])
   }
-
-  for (const s of recentSessions) {
-    const weekStart = getMondayOf(s.session_date)
-    const week = weeks.find(w => w.start === weekStart)
-    if (week) week.sessions.push(s)
-  }
-
   return weeks
 }
 
@@ -62,11 +33,20 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const today = new Date().toISOString().split('T')[0]
+  const historyScrollRef = useRef(null)
 
   useEffect(() => {
     fetch(`${API}/dashboard?athleteId=${athlete.id}&date=${today}`)
       .then(r => r.json())
-      .then(d => setData(d))
+      .then(d => {
+        setData(d)
+        // Auto-scroll training history to the most recent (rightmost) week
+        setTimeout(() => {
+          if (historyScrollRef.current) {
+            historyScrollRef.current.scrollLeft = historyScrollRef.current.scrollWidth
+          }
+        }, 50)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -80,8 +60,26 @@ export default function Dashboard() {
 
   const todayData = data?.today
   const nutrition = data?.nutrition
-  const recentSessions = data?.recentSessions || []
-  const weeks = buildWeeks(recentSessions)
+  const historyProgram = data?.historyProgram || []
+  const weeklyLogs = data?.weeklyLogs || []
+
+  // Build weeks array: oldest → newest (10 weeks)
+  const weekStarts = buildWeekStarts()
+
+  // Lookup: exerciseId → weekStart → { max_weight }
+  const logsMap = {}
+  for (const log of weeklyLogs) {
+    if (!logsMap[log.exercise_id]) logsMap[log.exercise_id] = {}
+    logsMap[log.exercise_id][log.week_start] = log
+  }
+
+  // Group program by session preserving DB order
+  const sessionMap = new Map()
+  for (const row of historyProgram) {
+    if (!sessionMap.has(row.session)) sessionMap.set(row.session, [])
+    sessionMap.get(row.session).push(row)
+  }
+  const historySessions = [...sessionMap.entries()].map(([session, exercises]) => ({ session, exercises }))
 
   const workoutComplete =
     !todayData?.isRestDay &&
@@ -213,35 +211,72 @@ export default function Dashboard() {
         </div>
       </button>
 
-      {/* Training history — last 10 weeks */}
+      {/* Training history grid — exercises × weeks */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-3">
         <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">Training History — Last 10 Weeks</p>
-        {recentSessions.length === 0 ? (
-          <p className="text-xs text-zinc-600 text-center py-4">No training data yet</p>
+        {historySessions.length === 0 ? (
+          <p className="text-xs text-zinc-600 text-center py-4">No program data yet</p>
         ) : (
-          <div className="flex flex-col gap-0.5">
-            {weeks.map((week, i) => (
-              <div
-                key={week.start}
-                className={`flex items-start justify-between py-2.5 ${i < weeks.length - 1 ? 'border-b border-zinc-800' : ''}`}
-              >
-                <p className="text-xs text-zinc-500 w-16 flex-shrink-0 pt-0.5">{fmtDate(week.start)}</p>
-                {week.sessions.length === 0 ? (
-                  <p className="text-xs text-zinc-700 flex-1 text-right">—</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1 justify-end flex-1">
-                    {week.sessions.map(s => (
-                      <span
-                        key={s.session_date + s.session}
-                        className="text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-md"
+          <div ref={historyScrollRef} className="overflow-x-auto -mx-1 px-1">
+            <table className="border-separate border-spacing-0" style={{ minWidth: `${120 + weekStarts.length * 48}px` }}>
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 bg-zinc-900 text-left text-[10px] text-zinc-600 font-normal pb-2 pr-2" style={{ minWidth: 120, maxWidth: 120 }} />
+                  {weekStarts.map(w => {
+                    const [, m, dd] = w.split('-')
+                    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]
+                    return (
+                      <th key={w} className="text-center pb-2 px-0.5" style={{ width: 48, minWidth: 48 }}>
+                        <div className="text-[10px] text-zinc-500 leading-tight font-normal">{parseInt(dd)}</div>
+                        <div className="text-[10px] text-zinc-600 leading-tight font-normal">{mon}</div>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {historySessions.map(({ session, exercises }) => (
+                  <>
+                    <tr key={`hdr-${session}`}>
+                      <td
+                        className="sticky left-0 z-10 bg-zinc-900 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider pt-3 pb-1 pr-2 whitespace-nowrap overflow-hidden"
+                        style={{ minWidth: 120, maxWidth: 120 }}
                       >
-                        {SESSION_ABBREV[s.session] || s.session}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                        {session}
+                      </td>
+                      {weekStarts.map(w => <td key={w} />)}
+                    </tr>
+                    {exercises.map(ex => {
+                      return (
+                        <tr key={ex.exercise_id}>
+                          <td
+                            className="sticky left-0 z-10 bg-zinc-900 text-[11px] text-zinc-300 py-1 pr-2 whitespace-nowrap overflow-hidden"
+                            style={{ minWidth: 120, maxWidth: 120, textOverflow: 'ellipsis' }}
+                            title={ex.exercise_name}
+                          >
+                            {ex.exercise_name}
+                          </td>
+                          {weekStarts.map(w => {
+                            const log = logsMap[ex.exercise_id]?.[w]
+                            return (
+                              <td key={w} className="text-center py-1 px-0.5" style={{ width: 48 }}>
+                                {log ? (
+                                  <span className="text-[11px] font-medium text-blue-400 tabular-nums">
+                                    {log.max_weight != null ? log.max_weight : 'BW'}
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-zinc-700">·</span>
+                                )}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

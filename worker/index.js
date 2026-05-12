@@ -167,15 +167,27 @@ async function handleDashboard(request, env, url) {
     loggedExercises = logged?.count ?? 0
   }
 
-  // Recent training sessions — last 70 days (all sessions, no schedule filter)
-  const recentRows = await env.DB.prepare(
-    `SELECT sl.session_date, sl.session, COUNT(DISTINCT sl.id) as exercises_logged
+  // Active program exercises for training history grid
+  const historyProgramRows = await env.DB.prepare(
+    `SELECT ap.session, ap.display_order, e.id as exercise_id, e.exercise_name, e.equipment
+     FROM athlete_program ap
+     JOIN exercises e ON ap.exercise_id = e.id
+     WHERE ap.athlete_id = ? AND ap.active = 1
+     ORDER BY ap.session, ap.display_order ASC`
+  ).bind(athleteId).all()
+
+  // Weekly max weight per exercise — past 70 days, grouped by Monday of that week
+  const weeklyLogRows = await env.DB.prepare(
+    `SELECT
+       sl.exercise_id,
+       date(sl.session_date, '-' || ((cast(strftime('%w', sl.session_date) as integer) + 6) % 7) || ' days') as week_start,
+       MAX(ss.weight_kg) as max_weight
      FROM session_logs sl
+     JOIN session_sets ss ON ss.session_log_id = sl.id
      WHERE sl.athlete_id = ?
        AND sl.session_date >= date('now', '-70 days')
-     GROUP BY sl.session_date, sl.session
-     ORDER BY sl.session_date DESC
-     LIMIT 70`
+       AND sl.exercise_id IS NOT NULL
+     GROUP BY sl.exercise_id, week_start`
   ).bind(athleteId).all()
 
   return json({
@@ -189,7 +201,8 @@ async function handleDashboard(request, env, url) {
       loggedExercises,
     },
     nutrition,
-    recentSessions: recentRows.results,
+    historyProgram: historyProgramRows.results,
+    weeklyLogs: weeklyLogRows.results,
   })
 }
 
