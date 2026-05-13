@@ -171,9 +171,10 @@ async function handleDashboard(request, env, url) {
 
   // Active program exercises for training history grid
   const historyProgramRows = await env.DB.prepare(
-    `SELECT ap.session, ap.display_order, e.id as exercise_id, e.exercise_name, e.equipment
+    `SELECT ap.session, ap.display_order, e.id as exercise_id, eb.name as exercise_name, e.equipment
      FROM athlete_program ap
      JOIN exercises e ON ap.exercise_id = e.id
+     JOIN exercise_base eb ON e.base_id = eb.id
      WHERE ap.athlete_id = ? AND ap.active = 1
      ORDER BY ap.session, ap.display_order ASC`
   ).bind(athleteId).all()
@@ -242,10 +243,11 @@ async function handleWorkout(request, env, url) {
   const session = scheduleRow.session
   const programRows = await env.DB.prepare(
     `SELECT ap.id as program_id, ap.goal_reps, ap.goal_weight_kg, ap.sets, ap.display_order,
-            e.id as exercise_id, e.exercise_name, e.session_category, e.equipment,
-            e.default_reps, e.default_weight_kg, e.default_sets, e.notes as coaching_notes
+            e.id as exercise_id, eb.name as exercise_name, eb.session_category, e.equipment,
+            e.default_reps, e.default_weight_kg, e.default_sets, eb.notes as coaching_notes
      FROM athlete_program ap
      JOIN exercises e ON ap.exercise_id = e.id
+     JOIN exercise_base eb ON e.base_id = eb.id
      WHERE ap.athlete_id = ? AND ap.session = ? AND ap.active = 1
      ORDER BY ap.display_order ASC`
   ).bind(athleteId, session).all()
@@ -366,9 +368,10 @@ async function handleProgramGet(request, env, url) {
 
   const rows = await env.DB.prepare(
     `SELECT ap.id, ap.session, ap.goal_reps, ap.goal_weight_kg, ap.sets, ap.display_order, ap.active,
-            e.id as exercise_id, e.exercise_name, e.session_category, e.equipment
+            e.id as exercise_id, eb.name as exercise_name, eb.session_category, e.equipment
      FROM athlete_program ap
      JOIN exercises e ON ap.exercise_id = e.id
+     JOIN exercise_base eb ON e.base_id = eb.id
      WHERE ap.athlete_id = ? AND ap.active = 1
      ORDER BY ap.session, ap.display_order ASC`
   ).bind(athleteId).all()
@@ -377,10 +380,39 @@ async function handleProgramGet(request, env, url) {
 }
 
 // POST /program/exercise
-// Body: { athleteId, exerciseId, session, goalReps, goalWeightKg, sets }
+// Body (existing exercise):  { athleteId, exerciseId, session, goalReps, goalWeightKg, sets }
+// Body (new exercise):       { athleteId, exerciseName, equipment, sessionCategory, session, goalReps, goalWeightKg, sets }
+// If exerciseName is provided without exerciseId the exercise is auto-created in the global library.
 async function handleProgramAdd(request, env) {
   const body = await request.json()
-  const { athleteId, exerciseId, session, goalReps, goalWeightKg, sets } = body
+  let { athleteId, exerciseId, exerciseName, equipment, sessionCategory, session, goalReps, goalWeightKg, sets } = body
+
+  // Auto-create path: exerciseName provided, no exerciseId
+  if (!exerciseId && exerciseName?.trim()) {
+    const name = exerciseName.trim()
+    const equip = equipment?.trim() || 'Bodyweight'
+
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO exercise_base (name, session_category) VALUES (?, ?)`
+    ).bind(name, sessionCategory || null).run()
+
+    const base = await env.DB.prepare(
+      `SELECT id FROM exercise_base WHERE name = ?`
+    ).bind(name).first()
+
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO exercises (base_id, equipment) VALUES (?, ?)`
+    ).bind(base.id, equip).run()
+
+    const ex = await env.DB.prepare(
+      `SELECT id FROM exercises WHERE base_id = ? AND equipment = ?`
+    ).bind(base.id, equip).first()
+
+    exerciseId = ex.id
+    // Invalidate exercise library cache so new entry appears immediately
+    await env.LTPT_V3_CACHE.delete('exercises:all')
+  }
+
   if (!athleteId || !exerciseId || !session) return json({ error: 'Missing required fields' }, 400)
 
   const maxOrder = await env.DB.prepare(
@@ -471,8 +503,11 @@ async function handleExercises(request, env) {
   if (cached) return json(cached)
 
   const rows = await env.DB.prepare(
-    `SELECT id, exercise_name, session_category, equipment, default_reps, default_weight_kg, default_sets, notes
-     FROM exercises ORDER BY exercise_name ASC`
+    `SELECT e.id, eb.name as exercise_name, eb.session_category, e.equipment,
+            e.default_reps, e.default_weight_kg, e.default_sets, eb.notes, e.base_id
+     FROM exercises e
+     JOIN exercise_base eb ON e.base_id = eb.id
+     ORDER BY eb.name ASC, e.equipment ASC`
   ).all()
 
   const result = { exercises: rows.results }
@@ -482,31 +517,44 @@ async function handleExercises(request, env) {
 
 // POST /exercises
 // Body: { exerciseName, sessionCategory, equipment, defaultReps, defaultWeightKg, defaultSets, notes }
+// Creates an exercise_base entry (upsert on name) then an exercises variant (upsert on base+equipment).
+// Returns the exercises.id to use as exerciseId in program assignment.
 async function handleExercisesCreate(request, env) {
   const body = await request.json()
   const { exerciseName, sessionCategory, equipment, defaultReps, defaultWeightKg, defaultSets, notes } = body
   if (!exerciseName?.trim()) return json({ error: 'Exercise name is required' }, 400)
 
+  const name  = exerciseName.trim()
+  const equip = equipment?.trim() || 'Bodyweight'
+
   try {
+    // Upsert base movement
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO exercise_base (name, session_category, notes) VALUES (?, ?, ?)`
+    ).bind(name, sessionCategory || null, notes?.trim() || null).run()
+
+    const base = await env.DB.prepare(
+      `SELECT id FROM exercise_base WHERE name = ?`
+    ).bind(name).first()
+
+    // Insert equipment variant — error if this exact base+equipment pair already exists
     const result = await env.DB.prepare(
-      `INSERT INTO exercises (exercise_name, session_category, equipment, default_reps, default_weight_kg, default_sets, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO exercises (base_id, equipment, default_reps, default_weight_kg, default_sets)
+       VALUES (?, ?, ?, ?, ?)`
     ).bind(
-      exerciseName.trim(),
-      sessionCategory || null,
-      equipment || null,
+      base.id,
+      equip,
       defaultReps || null,
       defaultWeightKg ? parseFloat(defaultWeightKg) : null,
-      defaultSets ? parseInt(defaultSets) : null,
-      notes?.trim() || null
+      defaultSets ? parseInt(defaultSets) : null
     ).run()
 
-    // Invalidate exercise library cache so next GET /exercises picks up the new entry
     await env.LTPT_V3_CACHE.delete('exercises:all')
-
-    return json({ success: true, id: result.meta.last_row_id })
+    return json({ success: true, id: result.meta.last_row_id, baseId: base.id })
   } catch (err) {
-    if (err.message?.includes('UNIQUE')) return json({ error: 'An exercise with that name already exists' }, 409)
+    if (err.message?.includes('UNIQUE')) {
+      return json({ error: `${name} (${equip}) already exists in the library` }, 409)
+    }
     return json({ error: 'Failed to create exercise' }, 500)
   }
 }
