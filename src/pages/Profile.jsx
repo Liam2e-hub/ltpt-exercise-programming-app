@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Layout from '../components/Layout'
@@ -18,6 +18,24 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [error, setError] = useState('')
+  const [showInstallModal, setShowInstallModal] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+  const isInstalled = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
+
+  useEffect(() => {
+    const handler = e => { e.preventDefault(); setDeferredPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleAndroidInstall() {
+    if (!deferredPrompt) return
+    deferredPrompt.prompt()
+    await deferredPrompt.userChoice
+    setDeferredPrompt(null)
+  }
 
   async function handleSave() {
     if (!firstName.trim()) { setError('First name is required'); return }
@@ -165,7 +183,71 @@ export default function Profile() {
               />
             </button>
           </div>
+
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-800">
+            <div>
+              <p className="text-sm font-medium">Add to Home Screen</p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {isInstalled ? 'Running as installed app' : 'Install as an app on your phone'}
+              </p>
+            </div>
+            {isInstalled ? (
+              <span className="text-xs text-green-400 font-medium">Installed ✓</span>
+            ) : isIOS ? (
+              <button
+                onClick={() => setShowInstallModal(true)}
+                className="text-sm font-semibold text-blue-400 active:opacity-60 transition-opacity"
+              >
+                How →
+              </button>
+            ) : deferredPrompt ? (
+              <button
+                onClick={handleAndroidInstall}
+                className="text-sm font-semibold text-blue-400 active:opacity-60 transition-opacity"
+              >
+                Install →
+              </button>
+            ) : null}
+          </div>
         </div>
+
+        {/* iOS install instructions modal */}
+        {showInstallModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-end bg-black/60"
+            onClick={() => setShowInstallModal(false)}
+          >
+            <div
+              className="w-full bg-zinc-900 border-t border-zinc-800 rounded-t-2xl p-6 pb-10"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-base font-bold">Add to Home Screen</h2>
+                <button
+                  onClick={() => setShowInstallModal(false)}
+                  className="text-sm text-zinc-400 active:opacity-60"
+                >
+                  Done
+                </button>
+              </div>
+              <p className="text-xs text-zinc-500 mb-5">
+                Open this page in <span className="text-white font-medium">Safari</span> to install the app.
+              </p>
+              {[
+                { n: 1, text: 'Tap the Share button at the bottom of Safari (the square with the arrow pointing up)' },
+                { n: 2, text: 'Scroll down and tap Add to Home Screen' },
+                { n: 3, text: 'Tap Add in the top right corner' },
+              ].map(({ n, text }) => (
+                <div key={n} className="flex items-start gap-3 mb-4">
+                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {n}
+                  </span>
+                  <p className="text-sm text-zinc-300 leading-snug">{text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Program & Schedule */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-3">
