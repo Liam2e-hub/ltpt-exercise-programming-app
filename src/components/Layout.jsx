@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import Nav from './Nav'
+import VoiceNoteButton from './VoiceNoteButton'
 
 export default function Layout({ children }) {
   const navigate = useNavigate()
@@ -24,6 +25,7 @@ export default function Layout({ children }) {
         </div>
       </button>
       {children}
+      <VoiceNoteButton />
       <Nav />
     </div>
   )
