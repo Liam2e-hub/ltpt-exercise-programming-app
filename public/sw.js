@@ -17,5 +17,9 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)))
+  e.respondWith(
+    fetch(e.request).catch(() =>
+      caches.match(e.request).then(cached => cached ?? new Response('Offline', { status: 503 }))
+    )
+  )
 })
